@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  auth-service:
+    build: ./services/auth
+    ports: ["8001:8001"]
+    depends_on: { mysql: { condition: service_healthy } }
+  product-service:
+    build: ./services/product
+    ports: ["8002:8002"]
+    depends_on: { mysql: { condition: service_healthy } }
+  inventory-service:
+    build: ./services/inventory
+    ports: ["8003:8003"]
+    depends_on: { mysql: { condition: service_healthy } }
+  order-service:
+    build: ./services/order
+    ports: ["8004:8004"]
+    depends_on: { mysql: { condition: service_healthy } }
+  payment-service:
+    build: ./services/payment
+    ports: ["8005:8005"]
+    depends_on: { mysql: { condition: service_healthy } }
+  gateway:
+    image: nginx:1.27-alpine
+    ports: ["8080:8080"]
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on: [auth-service, product-service, inventory-service, order-service, payment-service]
+volumes:
+  mysql_data:
